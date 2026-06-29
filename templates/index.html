@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KNN Mundial 2026 — Predictor</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg:       #111111;
+    --surface:  #1a1a1a;
+    --card:     #222222;
+    --border:   #2e2e2e;
+    --green:    #9eff7a;
+    --blue:     #0066ff;
+    --pink:     hotpink;
+    --yellow:   #ffe566;
+    --text:     #f2f5fa;
+    --muted:    #8899aa;
+    --grid:     #283442;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── GRID BACKGROUND ─── */
+  .grid-bg {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      linear-gradient(rgba(40,52,66,.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(40,52,66,.35) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* ─── SCREEN WRAPPER ─── */
+  .screen { position: relative; z-index: 1; display: none; }
+  .screen.active { display: block; }
+
+  /* ═══════════════════════
+     SCREEN 1 — INTRO
+  ═══════════════════════ */
+  #screen1 {
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 0 24px 60px;
+  }
+  #screen1.active { display: flex; }
+
+  /* ── Top badge ── */
+  .wc-badge {
+    margin-top: 36px;
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(0,102,255,.12);
+    border: 1px solid rgba(0,102,255,.4);
+    border-radius: 100px;
+    padding: 7px 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .12em;
+    color: var(--blue);
+    text-transform: uppercase;
+  }
+  .wc-badge .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--blue);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: .4; transform: scale(.7); }
+  }
+
+  /* ── Hero title ── */
+  .hero {
+    margin-top: 28px;
+    text-align: center;
+  }
+  .hero-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .25em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(72px, 10vw, 120px);
+    line-height: .92;
+    letter-spacing: .01em;
+    background: linear-gradient(135deg, var(--green) 0%, #4dffb4 50%, var(--blue) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .hero-sub {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(28px, 4vw, 48px);
+    letter-spacing: .06em;
+    color: var(--text);
+    margin-top: 4px;
+  }
+  .hero-desc {
+    margin-top: 16px;
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 520px;
+    line-height: 1.6;
+  }
+
+  /* ── Accent rule ── */
+  .rule {
+    width: 80px; height: 3px;
+    background: linear-gradient(90deg, var(--green), var(--blue));
+    border-radius: 2px;
+    margin: 22px auto 0;
+  }
+
+  /* ── Stats strip ── */
+  .stats-strip {
+    margin-top: 36px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+    justify-content: center;
+    width: 100%; max-width: 860px;
+  }
+  .stat-card {
+    flex: 1; min-width: 140px; max-width: 180px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  }
+  .stat-card.green::before  { background: var(--green); }
+  .stat-card.blue::before   { background: var(--blue); }
+  .stat-card.pink::before   { background: var(--pink); }
+  .stat-card.yellow::before { background: var(--yellow); }
+  .stat-card.teal::before   { background: #00cc96; }
+
+  .stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    letter-spacing: .02em;
+  }
+  .stat-card.green  .stat-val { color: var(--green); }
+  .stat-card.blue   .stat-val { color: var(--blue); }
+  .stat-card.pink   .stat-val { color: var(--pink); }
+  .stat-card.yellow .stat-val { color: var(--yellow); }
+  .stat-card.teal   .stat-val { color: #00cc96; }
+  .stat-label {
+    margin-top: 4px;
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── Info cards row ── */
+  .info-row {
+    margin-top: 24px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+    justify-content: center;
+    width: 100%; max-width: 860px;
+  }
+  .info-card {
+    flex: 1; min-width: 200px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .info-card h4 {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .tag-list {
+    display: flex; flex-wrap: wrap; gap: 6px;
+  }
+  .tag {
+    background: rgba(158,255,122,.1);
+    border: 1px solid rgba(158,255,122,.3);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    color: var(--green);
+    white-space: nowrap;
+  }
+  .tag.blue-tag {
+    background: rgba(0,102,255,.1);
+    border-color: rgba(0,102,255,.35);
+    color: #5599ff;
+  }
+  .model-line {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 7px;
+  }
+  .model-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .model-line span { font-size: 12px; color: var(--text); }
+  .model-line small { font-size: 11px; color: var(--muted); }
+
+  /* ── Accuracy bar ── */
+  .acc-bar-wrap {
+    margin-top: 6px;
+  }
+  .acc-label {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .acc-bar-bg {
+    height: 8px; border-radius: 4px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .acc-bar-fill {
+    height: 100%; border-radius: 4px;
+    transition: width 1s ease;
+  }
+  .acc-bar-fill.green { background: var(--green); }
+  .acc-bar-fill.blue  { background: var(--blue); }
+
+  /* ── Selector section ── */
+  .selector-section {
+    margin-top: 40px;
+    width: 100%; max-width: 860px;
+  }
+  .selector-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .selector-row {
+    display: flex; align-items: center; gap: 20px;
+    flex-wrap: wrap; justify-content: center;
+  }
+  .team-select-wrap {
+    flex: 1; min-width: 220px; max-width: 300px;
+  }
+  .team-select-wrap label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .team-select-wrap label span {
+    display: inline-block;
+    width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .team-select-wrap label .home-dot { background: var(--green); }
+  .team-select-wrap label .away-dot { background: var(--blue); }
+
+  select {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 14px 16px;
+    appearance: none;
+    cursor: pointer;
+    outline: none;
+    transition: border-color .2s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238899aa' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 40px;
+  }
+  select:hover { border-color: var(--green); }
+  select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(158,255,122,.12); }
+
+  .vs-badge {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    color: var(--muted);
+    letter-spacing: .06em;
+    flex-shrink: 0;
+    padding-top: 20px;
+  }
+
+  /* ── CTA button ── */
+  .cta-wrap { text-align: center; margin-top: 30px; }
+  .cta-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, var(--green) 0%, #4dffb4 100%);
+    color: #0a1a0a;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 16px 40px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 0 24px rgba(158,255,122,.3);
+  }
+  .cta-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 36px rgba(158,255,122,.5);
+  }
+  .cta-btn:active { transform: translateY(0); }
+  .cta-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+  .cta-arrow { font-size: 18px; }
+
+  /* ═══════════════════════
+     SCREEN 2 — RESULTADO
+  ═══════════════════════ */
+  #screen2 {
+    min-height: 100vh;
+    padding: 0 24px 80px;
+  }
+
+  /* ── Result hero ── */
+  .result-hero {
+    min-height: 65vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .result-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 50% at 50% 50%,
+      rgba(158,255,122,.07) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* confetti dots */
+  .confetti {
+    position: absolute; inset: 0; pointer-events: none;
+    overflow: hidden;
+  }
+  .confetti-dot {
+    position: absolute;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    animation: fall linear infinite;
+    opacity: 0;
+  }
+  @keyframes fall {
+    0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+  }
+
+  .result-eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .25em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .winner-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(64px, 14vw, 160px);
+    line-height: .88;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: .02em;
+    position: relative;
+  }
+  .winner-trophy {
+    font-size: clamp(36px, 5vw, 56px);
+    margin-top: 8px;
+  }
+  .result-sub {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    letter-spacing: .06em;
+  }
+  .result-sub strong { color: var(--text); }
+
+  .score-display {
+    margin-top: 28px;
+    display: flex; align-items: center; gap: 28px;
+    justify-content: center;
+  }
+  .score-team {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .score-team-name {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .score-number {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 72px;
+    line-height: 1;
+    color: var(--text);
+  }
+  .score-sep {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    color: var(--border);
+  }
+
+  .prob-bar-section {
+    margin-top: 24px;
+    width: 100%; max-width: 520px;
+    text-align: left;
+  }
+  .prob-row {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 8px;
+  }
+  .prob-row-label { font-size: 11px; color: var(--muted); width: 120px; text-align: right; white-space: nowrap; }
+  .prob-track { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+  .prob-fill { height: 100%; border-radius: 5px; transition: width 1.2s cubic-bezier(.4,0,.2,1); }
+  .prob-row-pct { font-size: 11px; font-family: 'Space Mono', monospace; width: 36px; }
+
+  /* Neighbors card */
+  .neighbors-section {
+    margin-top: 16px;
+    width: 100%; max-width: 520px;
+  }
+  .neighbors-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-align: left;
+  }
+  .neighbor-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; margin-bottom: 6px;
+    font-size: 11px;
+  }
+  .neighbor-teams { color: var(--text); }
+  .neighbor-score {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    color: var(--green);
+  }
+  .neighbor-date { color: var(--muted); font-size: 10px; }
+
+  /* back btn */
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 10px 22px;
+    border-radius: 50px;
+    cursor: pointer;
+    margin-top: 28px;
+    transition: border-color .2s, color .2s;
+  }
+  .back-btn:hover { border-color: var(--green); color: var(--green); }
+
+  /* ── Dashboard section ── */
+  .dashboard-section {
+    margin-top: 20px;
+  }
+  .dash-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    overflow: hidden;
+  }
+  .chart-card h5 {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .chart-card.full { grid-column: 1 / -1; }
+  .no-history {
+    display: flex; align-items: center; justify-content: center;
+    height: 200px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<!-- ══════════════════════════════════
+     SCREEN 1 — PRESENTACIÓN
+══════════════════════════════════ -->
+<section id="screen1" class="screen active">
+
+  <div class="wc-badge">
+    <span class="dot"></span>
+    FIFA World Cup 2026 · KNN Predictor
+  </div>
+
+  <div class="hero">
+    <p class="hero-eyebrow">Inteligencia Artificial Aplicada al Fútbol</p>
+    <div class="hero-title">KNN<br>MUNDIAL</div>
+    <div class="hero-sub">Match Predictor 2026</div>
+    <div class="rule"></div>
+    <p class="hero-desc">
+      Algoritmo de Machine Learning entrenado con +49.000 partidos internacionales
+      para predecir el resultado de cualquier enfrentamiento mundialista.
+    </p>
+  </div>
+
+  <!-- Stats strip — valores reales cargados desde el modelo -->
+  <div class="stats-strip">
+    <div class="stat-card green">
+      <div class="stat-val">49K+</div>
+      <div class="stat-label">Partidos analizados</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-val" id="stat-accuracy">61%</div>
+      <div class="stat-label">Precisión en test</div>
+    </div>
+    <div class="stat-card pink">
+      <div class="stat-val" id="stat-train">11.8K</div>
+      <div class="stat-label">Registros de entrenamiento</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-val">K=3</div>
+      <div class="stat-label">Vecinos óptimos</div>
+    </div>
+    <div class="stat-card teal">
+      <div class="stat-val">7</div>
+      <div class="stat-label">Variables del modelo</div>
+    </div>
+  </div>
+
+  <!-- Info row -->
+  <div class="info-row">
+
+    <div class="info-card">
+      <h4>Variables utilizadas</h4>
+      <div class="tag-list">
+        <span class="tag">home_elo</span>
+        <span class="tag">away_elo</span>
+        <span class="tag">dif_elo</span>
+        <span class="tag">home_rank_avg</span>
+        <span class="tag">home_rating_avg</span>
+        <span class="tag">away_rank_avg</span>
+        <span class="tag">away_rating_avg</span>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <h4>Detalles del modelo</h4>
+      <div class="model-line">
+        <div class="model-dot" style="background:var(--green)"></div>
+        <span>Algoritmo</span>
+        <small style="margin-left:auto">KNeighborsClassifier</small>
+      </div>
+      <div class="model-line">
+        <div class="model-dot" style="background:var(--blue)"></div>
+        <span>Scaler</span>
+        <small style="margin-left:auto">MinMaxScaler [0–1]</small>
+      </div>
+      <div class="model-line">
+        <div class="model-dot" style="background:var(--pink)"></div>
+        <span>Split</span>
+        <small style="margin-left:auto">80% train / 20% test</small>
+      </div>
+      <div class="model-line">
+        <div class="model-dot" style="background:var(--yellow)"></div>
+        <span>Dataset</span>
+        <small style="margin-left:auto">2014–2026</small>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <h4>Métricas de precisión</h4>
+      <div class="acc-bar-wrap">
+        <div class="acc-label">
+          <span>Set de prueba</span>
+          <span style="color:var(--green)" id="acc-test-label">–</span>
+        </div>
+        <div class="acc-bar-bg">
+          <div class="acc-bar-fill green" id="acc-test-bar" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="acc-bar-wrap" style="margin-top:12px">
+        <div class="acc-label">
+          <span>Set de entrenamiento</span>
+          <span style="color:var(--blue)">76%</span>
+        </div>
+        <div class="acc-bar-bg">
+          <div class="acc-bar-fill blue" style="width:76%"></div>
+        </div>
+      </div>
+      <div class="tag-list" style="margin-top:12px">
+        <span class="tag blue-tag">Victoria Local: 0.69</span>
+        <span class="tag blue-tag">Empate: 0.34</span>
+        <span class="tag blue-tag">Derrota: 0.64</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Selector -->
+  <div class="selector-section">
+    <p class="selector-title">— Seleccioná los equipos —</p>
+    <div class="selector-row">
+
+      <div class="team-select-wrap">
+        <label><span class="home-dot"></span>Equipo Local</label>
+        <select id="homeTeam">
+          <option value="">Cargando equipos...</option>
+        </select>
+      </div>
+
+      <div class="vs-badge">VS</div>
+
+      <div class="team-select-wrap">
+        <label><span class="away-dot"></span>Equipo Visitante</label>
+        <select id="awayTeam">
+          <option value="">Cargando equipos...</option>
+        </select>
+      </div>
+
+    </div>
+
+    <div class="cta-wrap">
+      <button class="cta-btn" id="predictBtn" onclick="predict()">
+        Predecir Resultado <span class="cta-arrow">→</span>
+      </button>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ══════════════════════════════════
+     SCREEN 2 — RESULTADO
+══════════════════════════════════ -->
+<section id="screen2" class="screen">
+
+  <div class="confetti" id="confetti"></div>
+
+  <div class="result-hero">
+    <p class="result-eyebrow" id="resultEyebrow">El algoritmo KNN predice como ganador a</p>
+
+    <div class="winner-name" id="winnerName">ARGENTINA</div>
+    <div class="winner-trophy" id="winnerTrophy">🏆</div>
+
+    <div class="result-sub">
+      <strong id="homeDisplay">–</strong> vs <strong id="awayDisplay">–</strong>
+    </div>
+
+    <!-- Score -->
+    <div class="score-display">
+      <div class="score-team">
+        <div class="score-team-name" id="scoreHomeLabel">–</div>
+        <div class="score-number" id="scoreHome">0</div>
+      </div>
+      <div class="score-sep">:</div>
+      <div class="score-team">
+        <div class="score-team-name" id="scoreAwayLabel">–</div>
+        <div class="score-number" id="scoreAway">0</div>
+      </div>
+    </div>
+
+    <!-- Prob bars -->
+    <div class="prob-bar-section">
+      <div class="prob-row">
+        <span class="prob-row-label" id="probHomeLabel">–</span>
+        <div class="prob-track">
+          <div class="prob-fill" id="probHomeBar" style="background:var(--green);width:0%"></div>
+        </div>
+        <span class="prob-row-pct" id="probHomePct" style="color:var(--green)">–</span>
+      </div>
+      <div class="prob-row">
+        <span class="prob-row-label">Empate</span>
+        <div class="prob-track">
+          <div class="prob-fill" id="probDrawBar" style="background:var(--yellow);width:0%"></div>
+        </div>
+        <span class="prob-row-pct" id="probDrawPct" style="color:var(--yellow)">–</span>
+      </div>
+      <div class="prob-row">
+        <span class="prob-row-label" id="probAwayLabel">–</span>
+        <div class="prob-track">
+          <div class="prob-fill" id="probAwayBar" style="background:var(--blue);width:0%"></div>
+        </div>
+        <span class="prob-row-pct" id="probAwayPct" style="color:var(--blue)">–</span>
+      </div>
+    </div>
+
+    <!-- Vecinos más cercanos -->
+    <div class="neighbors-section">
+      <p class="neighbors-title">Los 3 vecinos más cercanos (K=3)</p>
+      <div id="neighborsContainer"></div>
+    </div>
+
+    <button class="back-btn" onclick="goBack()">← Nueva predicción</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div class="dashboard-section">
+    <p class="dash-title">— Análisis del enfrentamiento —</p>
+    <div class="charts-grid" id="chartsGrid">
+
+      <div class="chart-card">
+        <h5>ELO 2026, ELO promedio y Ranking promedio</h5>
+        <div id="chart-metrics" style="height:300px"></div>
+      </div>
+
+      <div class="chart-card">
+        <h5>Probabilidad del resultado</h5>
+        <div id="chart-pie" style="height:300px"></div>
+      </div>
+
+      <div class="chart-card">
+        <h5>Accuracy del modelo KNN según el valor de K</h5>
+        <div id="chart-knn" style="height:300px"></div>
+      </div>
+
+      <div class="chart-card">
+        <h5>Matriz de confusión del modelo</h5>
+        <div id="chart-confusion" style="height:300px"></div>
+      </div>
+
+      <div class="chart-card full">
+        <h5>Historial de enfrentamientos (últimos 10 partidos)</h5>
+        <div id="chart-history" style="height:380px"></div>
+      </div>
+
+    </div>
+  </div>
+
+</section>
+
+
+<script>
+/* ─── Paleta ─── */
+const C = {
+  bg: 'rgb(17,17,17)', surface: '#1a1a1a',
+  green: '#9eff7a', blue: '#0066ff',
+  pink: 'hotpink', yellow: '#ffe566',
+  teal: '#00cc96', muted: '#8899aa', grid: '#283442',
+};
+
+/* ─── Flags ─── */
+const FLAGS = {
+  'Argentina':'🇦🇷','France':'🇫🇷','Spain':'🇪🇸','Brazil':'🇧🇷','Germany':'🇩🇪',
+  'Portugal':'🇵🇹','Netherlands':'🇳🇱','England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','Colombia':'🇨🇴','Uruguay':'🇺🇾',
+  'Belgium':'🇧🇪','Morocco':'🇲🇦','Japan':'🇯🇵','United States':'🇺🇸','Mexico':'🇲🇽',
+  'Canada':'🇨🇦','Croatia':'🇭🇷','Senegal':'🇸🇳','Ecuador':'🇪🇨','Switzerland':'🇨🇭',
+  'Norway':'🇳🇴','Turkey':'🇹🇷','Australia':'🇦🇺','South Korea':'🇰🇷','Algeria':'🇩🇿',
+  'Paraguay':'🇵🇾','Qatar':'🇶🇦','Saudi Arabia':'🇸🇦','Iran':'🇮🇷','Ivory Coast':'🇨🇮',
+  'Egypt':'🇪🇬','Sweden':'🇸🇪','Denmark':'🇩🇰','Italy':'🇮🇹','Austria':'🇦🇹',
+  'Panama':'🇵🇦','DR Congo':'🇨🇩','Jordan':'🇯🇴','Cape Verde':'🇨🇻',
+  'Bosnia and Herzegovina':'🇧🇦','Haiti':'🇭🇹','New Zealand':'🇳🇿',
+  'Iraq':'🇮🇶','Uzbekistan':'🇺🇿','Curaçao':'🇨🇼',
+};
+
+let teamData = {};
+
+/* ─── Init: cargar equipos + stats reales ─── */
+async function initApp(retries = 6) {
+  try {
+    const res = await fetch('/api/teams');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    teamData = await res.json();
+    const names = Object.keys(teamData).sort();
+    if (names.length === 0) throw new Error('Lista vacía — modelo aún cargando');
+
+    ['homeTeam', 'awayTeam'].forEach(id => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '<option value="">Seleccionar equipo...</option>';
+      names.forEach(n => {
+        const opt = new Option(`${FLAGS[n] || '🏴'} ${n}`, n);
+        sel.appendChild(opt);
+      });
+    });
+
+    document.getElementById('homeTeam').value = 'Argentina';
+    document.getElementById('awayTeam').value = 'Germany';
+    console.log(`✅ ${names.length} equipos cargados`);
+  } catch(e) {
+    console.warn(`⏳ Reintentando carga de equipos (${retries} restantes):`, e.message);
+    if (retries > 0) {
+      setTimeout(() => initApp(retries - 1), 2500);
+    } else {
+      ['homeTeam', 'awayTeam'].forEach(id => {
+        document.getElementById(id).innerHTML =
+          '<option value="">❌ Error — recargá la página</option>';
+      });
+    }
+  }
+}
+
+/* ─── Predict ─── */
+async function predict() {
+  const home = document.getElementById('homeTeam').value;
+  const away = document.getElementById('awayTeam').value;
+  if (!home || !away) { alert('Seleccioná ambos equipos para continuar.'); return; }
+  if (home === away) { alert('Seleccioná equipos distintos.'); return; }
+
+  const btn = document.getElementById('predictBtn');
+  btn.disabled = true;
+  btn.textContent = 'Analizando...';
+
+  try {
+    const [predRes, histRes] = await Promise.all([
+      fetch('/api/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ home, away }),
+      }),
+      fetch(`/api/history?home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}`),
+    ]);
+
+    const data    = await predRes.json();
+    const history = await histRes.json();
+
+    showResult({ home, away, data, history });
+  } catch(e) {
+    alert('Error al conectar con el servidor. Verificá que Flask esté corriendo.');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Predecir Resultado <span class="cta-arrow">→</span>';
+  }
+}
+
+/* ─── showResult ─── */
+function showResult({ home, away, data, history }) {
+  document.getElementById('screen1').classList.remove('active');
+  document.getElementById('screen2').classList.add('active');
+  window.scrollTo(0, 0);
+
+  const pred  = data.prediction;
+  const pHome = data.probabilities.home_win;
+  const pDraw = data.probabilities.draw;
+  const pAway = data.probabilities.away_win;
+  const sh    = data.score.home;
+  const sa    = data.score.away;
+
+  // Winner display
+  const winnerEl   = document.getElementById('winnerName');
+  const trophyEl   = document.getElementById('winnerTrophy');
+  const eyebrowEl  = document.getElementById('resultEyebrow');
+
+  if (pred === 2) {
+    winnerEl.textContent = home.toUpperCase();
+    winnerEl.style.background = 'linear-gradient(135deg, #9eff7a 0%, #4dffb4 60%, #00cc96 100%)';
+    winnerEl.style.webkitBackgroundClip = 'text';
+    winnerEl.style.webkitTextFillColor  = 'transparent';
+    trophyEl.textContent = '🏆';
+    eyebrowEl.textContent = 'El algoritmo KNN predice como ganador a';
+    document.getElementById('scoreHome').style.color = C.green;
+    document.getElementById('scoreAway').style.color = C.muted;
+  } else if (pred === 0) {
+    winnerEl.textContent = away.toUpperCase();
+    winnerEl.style.background = 'linear-gradient(135deg, #5599ff 0%, #0066ff 60%, #0044cc 100%)';
+    winnerEl.style.webkitBackgroundClip = 'text';
+    winnerEl.style.webkitTextFillColor  = 'transparent';
+    trophyEl.textContent = '🏆';
+    eyebrowEl.textContent = 'El algoritmo KNN predice como ganador a';
+    document.getElementById('scoreHome').style.color = C.muted;
+    document.getElementById('scoreAway').style.color = C.blue;
+  } else {
+    winnerEl.textContent = 'EMPATE';
+    winnerEl.style.background = 'linear-gradient(135deg, #ffe566 0%, #fff 100%)';
+    winnerEl.style.webkitBackgroundClip = 'text';
+    winnerEl.style.webkitTextFillColor  = 'transparent';
+    trophyEl.textContent = '🤝';
+    eyebrowEl.textContent = 'El algoritmo KNN predice';
+    document.getElementById('scoreHome').style.color = C.yellow;
+    document.getElementById('scoreAway').style.color = C.yellow;
+  }
+
+  // Meta
+  document.getElementById('homeDisplay').textContent    = home;
+  document.getElementById('awayDisplay').textContent    = away;
+  document.getElementById('scoreHomeLabel').textContent = home;
+  document.getElementById('scoreAwayLabel').textContent = away;
+  document.getElementById('scoreHome').textContent      = sh;
+  document.getElementById('scoreAway').textContent      = sa;
+
+  // Prob bars
+  document.getElementById('probHomeLabel').textContent = home;
+  document.getElementById('probAwayLabel').textContent = away;
+  const ph = Math.round(pHome * 100);
+  const pd = Math.round(pDraw * 100);
+  const pa = 100 - ph - pd;
+  document.getElementById('probHomePct').textContent = ph + '%';
+  document.getElementById('probDrawPct').textContent = pd + '%';
+  document.getElementById('probAwayPct').textContent = pa + '%';
+  setTimeout(() => {
+    document.getElementById('probHomeBar').style.width = ph + '%';
+    document.getElementById('probDrawBar').style.width = pd + '%';
+    document.getElementById('probAwayBar').style.width = pa + '%';
+  }, 100);
+
+  // Vecinos
+  const nc = document.getElementById('neighborsContainer');
+  nc.innerHTML = data.neighbors.map(n => `
+    <div class="neighbor-row">
+      <span class="neighbor-teams">${FLAGS[n.home_team]||''} ${n.home_team} vs ${FLAGS[n.away_team]||''} ${n.away_team}</span>
+      <span class="neighbor-score">${n.home_score} – ${n.away_score}</span>
+      <span class="neighbor-date">${n.date}</span>
+    </div>`).join('');
+
+  spawnConfetti();
+  setTimeout(() => drawCharts(home, away, data, history), 200);
+}
+
+/* ─── goBack ─── */
+function goBack() {
+  document.getElementById('screen2').classList.remove('active');
+  document.getElementById('screen1').classList.add('active');
+  window.scrollTo(0, 0);
+  document.getElementById('confetti').innerHTML = '';
+  ['chart-metrics','chart-pie','chart-knn','chart-confusion','chart-history'].forEach(id => {
+    Plotly.purge(id);
+  });
+}
+
+/* ─── Confetti ─── */
+function spawnConfetti() {
+  const cont = document.getElementById('confetti');
+  cont.innerHTML = '';
+  const colors = [C.green, C.blue, C.pink, C.yellow, C.teal];
+  for (let i = 0; i < 55; i++) {
+    const d = document.createElement('div');
+    d.className = 'confetti-dot';
+    d.style.left = Math.random() * 100 + 'vw';
+    d.style.background = colors[Math.floor(Math.random() * colors.length)];
+    d.style.animationDuration = (2.5 + Math.random() * 3) + 's';
+    d.style.animationDelay    = (Math.random() * 2) + 's';
+    d.style.width = d.style.height = (5 + Math.random() * 8) + 'px';
+    cont.appendChild(d);
+  }
+}
+
+/* ─── Charts ─── */
+function drawCharts(home, away, data, history) {
+  const L = (extra = {}) => ({
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  'transparent',
+    font: { color: '#f2f5fa', size: 11, family: 'Inter' },
+    margin: { t: 20, l: 50, r: 20, b: 50 },
+    xaxis: { gridcolor: C.grid, linecolor: C.grid, zerolinecolor: C.grid },
+    yaxis: { gridcolor: C.grid, linecolor: C.grid, zerolinecolor: C.grid },
+    legend: { bgcolor: 'transparent', orientation: 'h', y: -0.2 },
+    hoverlabel: { bgcolor: '#222', bordercolor: '#444' },
+    ...extra,
+  });
+  const cfg = { responsive: true, displayModeBar: false };
+
+  /* ── Chart 1: Métricas comparativas (ELO 2026, Rating avg, Rank avg) ── */
+  const h = data.home, a = data.away;
+  Plotly.newPlot('chart-metrics', [
+    {
+      name: home,
+      x: ['ELO 2026', 'ELO Promedio', 'Ranking Prom.'],
+      y: [h.elo, h.rating_avg, h.rank_avg],
+      type: 'bar',
+      marker: { color: C.green },
+      text: [h.elo.toFixed(0), h.rating_avg.toFixed(0), h.rank_avg.toFixed(1)],
+      textposition: 'outside',
+    },
+    {
+      name: away,
+      x: ['ELO 2026', 'ELO Promedio', 'Ranking Prom.'],
+      y: [a.elo, a.rating_avg, a.rank_avg],
+      type: 'bar',
+      marker: { color: C.blue },
+      text: [a.elo.toFixed(0), a.rating_avg.toFixed(0), a.rank_avg.toFixed(1)],
+      textposition: 'outside',
+    },
+  ], L({ barmode: 'group', bargap: 0.25, margin: { t: 30, l: 50, r: 20, b: 70 } }), cfg);
+
+  /* ── Chart 2: Torta de probabilidades ── */
+  const pHome = data.probabilities.home_win;
+  const pDraw = data.probabilities.draw;
+  const pAway = data.probabilities.away_win;
+  Plotly.newPlot('chart-pie', [{
+    type: 'pie',
+    labels: [`${home} gana`, 'Empate', `${away} gana`],
+    values: [pHome, pDraw, pAway],
+    hole: 0.45,
+    marker: { colors: [C.green, C.yellow, C.blue] },
+    textinfo: 'label+percent',
+    textfont: { size: 11 },
+    hovertemplate: '%{label}: %{percent}<extra></extra>',
+  }], {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  'transparent',
+    font: { color: '#f2f5fa', size: 11, family: 'Inter' },
+    margin: { t: 10, l: 10, r: 10, b: 10 },
+    showlegend: false,
+    hoverlabel: { bgcolor: '#222', bordercolor: '#444' },
+  }, cfg);
+
+  /* ── Chart 3: Accuracy vs K ── */
+  const kVals   = data.k_values;
+  const kScores = data.k_scores;
+  const bestIdx = kScores.indexOf(Math.max(...kScores));
+  const bestK   = kVals[bestIdx];
+  const bestAcc = kScores[bestIdx];
+
+  Plotly.newPlot('chart-knn', [
+    { x: kVals, y: kScores, mode: 'lines+markers', type: 'scatter',
+      line: { color: C.blue, width: 2 },
+      marker: { size: 5, color: C.blue },
+      name: 'Accuracy',
+      hovertemplate: 'K=%{x}<br>%{y:.1%}<extra></extra>',
+    },
+    { x: [bestK], y: [bestAcc], mode: 'markers+text',
+      marker: { size: 12, color: C.green },
+      text: [`K=${bestK}`],
+      textposition: 'top center',
+      textfont: { color: C.green },
+      showlegend: false,
+      hovertemplate: `K ideal=${bestK}: ${(bestAcc*100).toFixed(1)}%<extra></extra>`,
+    },
+  ], L({
+    margin: { t: 20, l: 50, r: 20, b: 60 },
+    xaxis: { gridcolor: C.grid, linecolor: C.grid, zerolinecolor: C.grid,
+             dtick: 2, title: { text: 'Número de vecinos (K)', font: { color: C.muted } } },
+    yaxis: { gridcolor: C.grid, linecolor: C.grid, zerolinecolor: C.grid,
+             tickformat: '.0%', title: { text: 'Accuracy', font: { color: C.muted } } },
+    showlegend: false,
+  }), cfg);
+
+  /* ── Chart 4: Matriz de confusión ── */
+  const cm     = data.conf_matrix;   // [[VV,VE,VD],[EV,EE,ED],[DV,DE,DD]]
+  const labels = data.cm_labels;     // ["Victoria Local","Empate","Derrota Local"]
+
+  // Crear texto con valores para cada celda
+  const zText = cm.map(row => row.map(v => String(v)));
+
+  Plotly.newPlot('chart-confusion', [{
+    type: 'heatmap',
+    z: cm,
+    x: labels,
+    y: labels,
+    text: zText,
+    texttemplate: '%{text}',
+    colorscale: [[0,'#0a1f3a'],[0.5,'#1a5fb4'],[1,'#4fc3f7']],
+    showscale: false,
+    hovertemplate: 'Real: %{y}<br>Pred: %{x}<br>Cantidad: %{z}<extra></extra>',
+  }], {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  'transparent',
+    font: { color: '#f2f5fa', size: 11, family: 'Inter' },
+    margin: { t: 20, l: 110, r: 20, b: 80 },
+    xaxis: { title: { text: 'Predicción', font: { color: C.muted } },
+             tickangle: -15 },
+    yaxis: { title: { text: 'Valor real', font: { color: C.muted } },
+             autorange: 'reversed' },
+    hoverlabel: { bgcolor: '#222', bordercolor: '#444' },
+  }, cfg);
+
+  /* ── Chart 5: Historial H2H (horizontal, full width) ── */
+  if (history.length === 0) {
+    document.getElementById('chart-history').innerHTML =
+      '<div class="no-history">Sin historial de enfrentamientos entre estos equipos</div>';
+  } else {
+    const labels2   = history.map(m => `${m.date} | ${m.home_team} vs ${m.away_team}`);
+    const homeGoals = history.map(m => m.home_team === home ? m.home_score : m.away_score);
+    const awayGoals = history.map(m => m.home_team === away ? m.home_score : m.away_score);
+    const histHeight = Math.max(320, history.length * 48);
+    document.getElementById('chart-history').style.height = histHeight + 'px';
+
+    Plotly.newPlot('chart-history', [
+      { name: home, x: homeGoals, y: labels2, type: 'bar', orientation: 'h',
+        marker: { color: C.green }, text: homeGoals, textposition: 'outside' },
+      { name: away, x: awayGoals, y: labels2, type: 'bar', orientation: 'h',
+        marker: { color: C.blue  }, text: awayGoals, textposition: 'outside' },
+    ], L({ barmode: 'group', margin: { t: 10, l: 280, r: 60, b: 40 },
+           legend: { bgcolor: 'transparent', orientation: 'h', y: 1.08 } }), cfg);
+  }
+}
+
+/* ─── Arranque ─── */
+(async () => {
+  await initApp();
+
+  // Actualizar stats de accuracy con datos reales del modelo
+  try {
+    const res = await fetch('/api/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ home: 'Argentina', away: 'Germany' }),
+    });
+    const d = await res.json();
+    const acc = Math.round(d.accuracy * 100);
+    document.getElementById('stat-accuracy').textContent = acc + '%';
+    document.getElementById('acc-test-label').textContent = acc + '%';
+    document.getElementById('acc-test-bar').style.width = acc + '%';
+    if (d.train_size) {
+      const ts = d.train_size;
+      document.getElementById('stat-train').textContent =
+        ts >= 1000 ? (ts/1000).toFixed(1) + 'K' : ts;
+    }
+  } catch(e) {}
+})();
+</script>
+
+</body>
+</html>
