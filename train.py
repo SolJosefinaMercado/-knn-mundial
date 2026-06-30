@@ -163,8 +163,9 @@ def build_and_save():
         results=results_full[["date", "home_team", "away_team", "home_score", "away_score"]],
     )
 
-    joblib.dump(payload, "model.pkl", compress=3)
-    size_mb = os.path.getsize("model.pkl") / 1e6
+    model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.pkl")
+    joblib.dump(payload, model_path, compress=3)
+    size_mb = os.path.getsize(model_path) / 1e6
     print(f"✅ model.pkl guardado ({size_mb:.1f} MB)")
 
 if __name__ == "__main__":

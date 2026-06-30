@@ -6,7 +6,8 @@ import os
 app = Flask(__name__)
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
-MODEL = joblib.load("model.pkl")
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.pkl")
+MODEL = joblib.load(MODEL_PATH)
 
 # ---------------------------------------------------------------------------
 # ROUTES

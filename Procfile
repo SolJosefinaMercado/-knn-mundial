@@ -1,1 +1,1 @@
-web: gunicorn app:app
+web: python train.py && gunicorn app:app --workers 1 --threads 1 --timeout 120
