@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: knn-mundial
+    env: python
+    buildCommand: pip install -r requirements.txt && python train.py
+    startCommand: gunicorn app:app --workers 1 --threads 1 --timeout 120
+    plan: free
