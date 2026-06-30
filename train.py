@@ -1,8 +1,8 @@
 """
-Entrena el modelo KNN y serializa todo lo necesario en model.pkl.
-Se ejecuta UNA vez durante el build (no en runtime).
+Entrena el modelo KNN y serializa todo en model.pkl.
+Se ejecuta UNA vez durante el build de Render.
 """
-import os, joblib
+import os, gc, joblib
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -13,70 +13,63 @@ from sklearn.metrics import confusion_matrix
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 def build_and_save():
-    # 1. results.csv
-    results = pd.read_csv(os.path.join(DATA_DIR, "results.csv"))
-    results.drop(columns=["tournament", "city", "country", "neutral"], inplace=True)
+    print("Cargando datos...")
+    results = pd.read_csv(os.path.join(DATA_DIR, "results.csv"),
+                          usecols=["date", "home_team", "away_team", "home_score", "away_score"])
     results.dropna(subset=["home_score", "away_score"], inplace=True)
     results["home_score"] = results["home_score"].astype(int)
     results["away_score"] = results["away_score"].astype(int)
     results["date"] = pd.to_datetime(results["date"])
 
-    # 2. Filtro 2014 → hoy
-    results_filter = results[
-        (results["date"] >= "2014-01-01") &
-        (results["date"] <= pd.Timestamp.today())
-    ].copy()
+    results_full = results.copy()   # guardamos para historial H2H
+
+    results_filter = results[results["date"] >= "2014-01-01"].copy()
     results_filter["year"] = results_filter["date"].dt.year
+    del results
+    gc.collect()
 
-    # 3. elo_ratings_wc2026.csv
-    elo = pd.read_csv(os.path.join(DATA_DIR, "elo_ratings_wc2026.csv"))
-    elo.drop(columns=[c for c in elo.columns
-                      if c not in ("year", "country", "rating", "rank_avg", "rating_avg")],
-             inplace=True)
+    elo = pd.read_csv(os.path.join(DATA_DIR, "elo_ratings_wc2026.csv"),
+                      usecols=["year", "country", "rating", "rank_avg", "rating_avg"])
     elo_filter = elo[elo["year"] >= 2013].copy()
+    del elo
+    gc.collect()
 
-    # 4. Merge home
-    df_merged = pd.merge(
+    print("Mergeando datasets...")
+    df = pd.merge(
         results_filter,
-        elo_filter.rename(columns={
-            "country": "home_team", "rating": "home_elo",
-            "rank_avg": "home_rank_avg", "rating_avg": "home_rating_avg",
-        }),
-        left_on=["year", "home_team"], right_on=["year", "home_team"], how="inner",
+        elo_filter.rename(columns={"country": "home_team", "rating": "home_elo",
+                                   "rank_avg": "home_rank_avg", "rating_avg": "home_rating_avg"}),
+        on=["year", "home_team"], how="inner",
     )
-    df_merged.drop(columns=["year"], inplace=True)
-    df_merged["year"] = df_merged["date"].dt.year
+    df.drop(columns=["year"], inplace=True)
+    df["year"] = df["date"].dt.year
 
-    # 5. Merge away
-    df_merged = pd.merge(
-        df_merged,
-        elo_filter.rename(columns={
-            "country": "away_team", "rating": "away_elo",
-            "rank_avg": "away_rank_avg", "rating_avg": "away_rating_avg",
-        }),
-        left_on=["year", "away_team"], right_on=["year", "away_team"], how="inner",
+    df = pd.merge(
+        df,
+        elo_filter.rename(columns={"country": "away_team", "rating": "away_elo",
+                                   "rank_avg": "away_rank_avg", "rating_avg": "away_rating_avg"}),
+        on=["year", "away_team"], how="inner",
     )
-    df_merged.drop(columns=["year"], inplace=True)
+    df.drop(columns=["year"], inplace=True)
+    del results_filter
+    gc.collect()
 
-    # 6. Target + dif_elo
-    df_merged["target"] = np.where(df_merged["home_score"] > df_merged["away_score"], 2, 0)
-    df_merged["target"] = np.where(df_merged["home_score"] == df_merged["away_score"], 1, df_merged["target"])
-    df_merged["dif_elo"] = df_merged["home_elo"] - df_merged["away_elo"]
+    df["target"] = np.where(df["home_score"] > df["away_score"], 2, 0)
+    df["target"] = np.where(df["home_score"] == df["away_score"], 1, df["target"])
+    df["dif_elo"] = df["home_elo"] - df["away_elo"]
 
-    # 7. Features / target
     features = ["home_elo", "away_elo", "dif_elo",
                 "home_rank_avg", "home_rating_avg",
                 "away_rank_avg", "away_rating_avg"]
-    X = df_merged[features]
-    y = df_merged["target"]
+    X = df[features].values
+    y = df["target"].values
+    orig_idx = np.arange(len(X))
 
-    # 8. Split
-    orig_idx = X.index.to_numpy()
     X_tr, X_te, y_tr, y_te, idx_tr, idx_te = train_test_split(
         X, y, orig_idx, test_size=0.2, random_state=0
     )
 
-    # 9. Scaler + KNN k=3 (predicción) + k=15 (probabilidades)
+    print("Entrenando scaler y modelos KNN...")
     scaler = MinMaxScaler()
     X_tr_s = scaler.fit_transform(X_tr)
     X_te_s = scaler.transform(X_te)
@@ -89,24 +82,35 @@ def build_and_save():
     knn_proba = KNeighborsClassifier(n_neighbors=15)
     knn_proba.fit(X_tr_s, y_tr)
 
-    # 10. Matriz de confusión
     y_pred_te = knn.predict(X_te_s)
     cm = confusion_matrix(y_te, y_pred_te, labels=[2, 1, 0])
+    del X_te, y_te, y_pred_te
+    gc.collect()
 
-    # 11. Curva K (1-29)
+    # Curva K: solo valores impares 1-29 para reducir cómputo
+    print("Calculando curva K...")
+    k_values = list(range(1, 30))
     k_scores = []
-    for k in range(1, 30):
+    X_te_s2 = scaler.transform(X_tr[: len(X_tr) // 5])  # subset para validación rápida
+    y_te2 = y_tr[: len(y_tr) // 5]
+    X_tr_s2 = X_tr_s[len(X_tr) // 5:]
+    y_tr2 = y_tr[len(y_tr) // 5:]
+    for k in k_values:
         tmp = KNeighborsClassifier(n_neighbors=k)
-        tmp.fit(X_tr_s, y_tr)
-        k_scores.append(round(tmp.score(X_te_s, y_te), 4))
+        tmp.fit(X_tr_s2, y_tr2)
+        k_scores.append(round(tmp.score(X_te_s2, y_te2), 4))
+        del tmp
+    del X_tr_s2, y_tr2, X_te_s2, y_te2
+    gc.collect()
 
-    # 12. Distribución
+    # Distribución
     rm = {0: "Derrota Local", 1: "Empate", 2: "Victoria Local"}
-    dist = {rm[k]: int(v) for k, v in df_merged["target"].value_counts().items()}
+    unique, counts = np.unique(y, return_counts=True)
+    dist = {rm[int(k)]: int(v) for k, v in zip(unique, counts)}
 
-    # 13. ELO actual (World.tsv)
-    elo_actual = pd.read_csv(os.path.join(DATA_DIR, "World.tsv"), sep="\t", header=None)
-    elo_actual = elo_actual[[2, 3]]
+    # ELO actual (World.tsv)
+    elo_actual = pd.read_csv(os.path.join(DATA_DIR, "World.tsv"), sep="\t", header=None,
+                             usecols=[2, 3])
     elo_actual.columns = ["country_code", "elo_2026"]
     cc = {
         "AR": "Argentina", "FR": "France", "ES": "Spain", "US": "United States",
@@ -126,7 +130,6 @@ def build_and_save():
     elo_actual.dropna(subset=["country"], inplace=True)
     elo_map = dict(zip(elo_actual["country"], elo_actual["elo_2026"]))
 
-    # 14. team_info
     elo_latest = elo_filter.sort_values("year").groupby("country").last().reset_index()
     team_info = {}
     for _, row in elo_latest.iterrows():
@@ -138,29 +141,31 @@ def build_and_save():
                 "rating_avg": float(row["rating_avg"]),
             }
 
+    # df_merged solo con columnas necesarias para kneighbors lookup
+    df_lookup = df[["home_team", "away_team", "home_score", "away_score", "date"]].copy()
+
     payload = dict(
         knn=knn,
         knn_proba=knn_proba,
         scaler=scaler,
         features=features,
         team_info=team_info,
-        elo_filter=elo_filter,
-        df_merged=df_merged[["date", "home_team", "away_team",
-                              "home_score", "away_score"]],   # solo lo necesario
+        elo_filter=elo_filter[["year", "country", "rank_avg", "rating_avg"]],
+        df_merged=df_lookup,
         idx_tr=idx_tr,
-        k_values=list(range(1, 30)),
+        k_values=k_values,
         k_scores=k_scores,
         dist=dist,
         accuracy=accuracy,
         train_size=len(X_tr),
         conf_matrix=cm.tolist(),
         cm_labels=["Victoria Local", "Empate", "Derrota Local"],
-        # results completo para historial H2H
-        results=results[["date", "home_team", "away_team", "home_score", "away_score"]],
+        results=results_full[["date", "home_team", "away_team", "home_score", "away_score"]],
     )
 
     joblib.dump(payload, "model.pkl", compress=3)
-    print(f"✅ model.pkl guardado ({os.path.getsize('model.pkl') / 1e6:.1f} MB)")
+    size_mb = os.path.getsize("model.pkl") / 1e6
+    print(f"✅ model.pkl guardado ({size_mb:.1f} MB)")
 
 if __name__ == "__main__":
     build_and_save()
